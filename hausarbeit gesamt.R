@@ -568,6 +568,22 @@ ggplot(melt(topic_correlation), aes(Var1, Var2, fill = value)) +
   labs(title = "Themenkorrelationen", x = "Thema", y = "Thema")
 
 # tsne-Visualisierung
+unique_theta <- unique(key_topics$theta)
+tsne_result <- Rtsne(unique_theta, dims = 2)
+
+tsne_data <- data.frame(
+  X = tsne_result$Y[, 1],  # 1. Dimension
+  Y = tsne_result$Y[, 2],  # 2. Dimension
+  Document = 1:nrow(unique_theta)  # Dokumente
+)
+
+ggplot(tsne_data, aes(x = X, y = Y)) +
+  geom_point(size = 2, color = "steelblue") +
+  labs(title = "t-SNE Visualisierung der Dokumente im Themenraum",
+       x = "Dimension 1",
+       y = "Dimension 2") +
+  theme_minimal()
+
 
 # Kohärenz per Topic
 # Berechne die Kohärenz
