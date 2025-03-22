@@ -1,5 +1,5 @@
 #################HAUSARBEIT############################
-######################################################
+#######################################################
 #Jana Borchers
 #Forschungspraktikum: Computational Social Science
 
@@ -190,7 +190,7 @@ meta_data <- doc_combined@meta
 
 
 #Collocations ersetzen
-collocations <- c("from the river to the sea", "fridays for future", "free palestine", "palestine be free")
+collocations <- c("from the river to the sea", "fridays for future", "free palestine", "palestine will be free")
 
 # Funktion zum Ersetzen der Collocations durch lesbare Platzhalter
 replace_collocations <- function(articles, collocations) {
@@ -226,9 +226,9 @@ articles_toks <- tokens(articles_corpus,
 #german stopwords
 filepath <- "C:/Users/janab/Documents/Uni/CSS/stopwords-de.txt"
 stopwords <- readLines(filepath)
-garbagewords <- c("graphic", "gesamtseiten-pdf", "weblink", "innen", "pdf", "pdf-dokument", "bild", "pdf-datei")
+garbagewords <- c("graphic", "gesamtseiten-pdf", "weblink", "innen", "pdf", "pdf-dokument", "bild")
 
-articles_toks <- tokens_remove(articles_toks, stopwords, case_insensitive = TRUE)
+articles_toks <- tokens_remove(articles_toks, german_stop, case_insensitive = TRUE)
 articles_toks <- tokens_remove(articles_toks, garbagewords, case_insensitive = TRUE)
 
 
@@ -504,16 +504,17 @@ top_words(key_topics, 20)
 ##########################################
 #Inhaltliche Interpretation
 #Top Article pro Thema
-# Wahrscheinlichkeiten aus der 'theta'-Matrix
+# Extrahiere die Wahrscheinlichkeiten aus der 'theta'-Matrix
 topic_assignments <- key_topics$theta
 
-# Thema mit der höchsten Wahrscheinlichkeit für jedes Dokument
+# Finde das Thema mit der höchsten Wahrscheinlichkeit für jedes Dokument
 dominant_topics <- apply(topic_assignments, 1, which.max)
 
-# DataFrame mit den Dokumenten und ihren dominanten Themen
+# Erstelle einen DataFrame mit den Dokumenten und ihren dominanten Themen
 docs_with_topics <- data.frame(doc_id = 1:nrow(topic_assignments), 
                                dominant_topic = dominant_topics)
 
+# Falls du die Themenbezeichner (z.B. '1_kritik', '2_forderungen', ...) anzeigen möchtest:
 topic_labels <- colnames(topic_assignments)  # Entspricht den Namen der Themen
 docs_with_topics$topic_name <- topic_labels[dominant_topics]
 
@@ -524,12 +525,17 @@ head(docs_with_topics, n=40)
 top_articles_per_topic <- list()
 
 for (topic in 1:ncol(topic_assignments)) {
-  # Dokumente mit der höchsten Wahrscheinlichkeit für dieses Thema
+  # Finde die Zeilen (Dokumente) mit der höchsten Wahrscheinlichkeit für dieses Thema
   top_docs <- order(topic_assignments[, topic], decreasing = TRUE)[1:5]  # z.B. die 5 Dokumente mit der höchsten Wahrscheinlichkeit
-    top_articles <- articles_df$Article[top_docs]
-    top_articles_per_topic[[colnames(topic_assignments)[topic]]] <- top_articles
+  
+  # Extrahiere die entsprechenden Texte
+  top_articles <- articles_df$Article[top_docs]
+  
+  # Speichere die Texte in der Liste
+  top_articles_per_topic[[colnames(topic_assignments)[topic]]] <- top_articles
 }
 
+# Zeige die Texte mit den höchsten Wahrscheinlichkeiten für jedes Thema an
 head(top_articles_per_topic)
 
 #Beispieltexte anschauen
@@ -538,8 +544,10 @@ articles_df$Article[articles_df$ID == 9]
 docs_with_topics$topic_name[articles_df$ID == 120]
 
 #Welche Artikel wurden antisemitismus zugeordnet?
+# Filtere die Dokumente, die dem Thema "3_antisemitismus" zugeordnet sind
 topic_3_ids <- docs_with_topics[docs_with_topics$topic_name == "3_antisemitismus", "doc_id"]
 
+# Ausgabe der IDs
 print(topic_3_ids)
 
 
@@ -562,6 +570,8 @@ ggplot(melt(topic_correlation), aes(Var1, Var2, fill = value)) +
 # tsne-Visualisierung
 unique_theta <- unique(key_topics$theta)
 tsne_result <- Rtsne(unique_theta, dims = 2)
+tsne_data$Topic <- apply(unique_theta, 1, which.max)
+
 
 tsne_data <- data.frame(
   X = tsne_result$Y[, 1],  # 1. Dimension
@@ -574,6 +584,52 @@ ggplot(tsne_data, aes(x = X, y = Y)) +
   labs(title = "t-SNE Visualisierung der Dokumente im Themenraum",
        x = "Dimension 1",
        y = "Dimension 2") +
+  theme_minimal()
+
+#bessere farbliche Absetzung der Themen
+custom_colors <- c("red", "blue", "green", "orange", viridis::viridis(length(unique(tsne_data$Topic)) - 4))
+
+# Visualisierung mit angepasster Farbskala
+ggplot(tsne_data, aes(x = X, y = Y, color = as.factor(Topic))) +
+  geom_point(size = 2) +
+  labs(
+    title = "t-SNE Visualisierung der Dokumente nach Topics",
+    x = "Dimension 1",
+    y = "Dimension 2",
+    color = "Topic"
+  ) +
+  scale_color_manual(values = custom_colors) +
+  theme_minimal()
+
+#Thema 18 bzw Other_14 nicht in der Graphik enthalten:
+
+table(tsne_data$Topic) # wie viele Dokumente wurden jeweils welchem Thema zugeordnet
+#bzw weisen die höchste Wahrscheinlichkeit für dieses Thema auf?
+#18 kommt hier nicht vor -> für kein Dokument die höchste Wahrscheinlichkeit 
+
+# statt Zuweisung bei Maximum: Neuen Schwellenwert definieren 
+threshold <- 0.05  
+
+tsne_data$Topic <- apply(unique_theta, 1, function(x) {
+  if (x[18] >= threshold) {
+    return(18)  
+  } else {
+    return(which.max(x))  # Sonst das dominante Thema nehmen
+  }
+})
+
+custom_colors <- c("red", "blue", "green", "orange", viridis::viridis(length(unique(tsne_data$Topic)) - 4))
+
+# Visualisierung mit angepasster Farbskala
+ggplot(tsne_data, aes(x = X, y = Y, color = as.factor(Topic))) +
+  geom_point(size = 2) +
+  labs(
+    title = "t-SNE Visualisierung der Dokumente nach Topics",
+    x = "Dimension 1",
+    y = "Dimension 2",
+    color = "Topic"
+  ) +
+  scale_color_manual(values = custom_colors) +
   theme_minimal()
 
 
