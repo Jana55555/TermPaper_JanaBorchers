@@ -586,7 +586,7 @@ ggplot(tsne_data, aes(x = X, y = Y)) +
        y = "Dimension 2") +
   theme_minimal()
 
-#bessere farbliche Absetzung der Themen
+#bessere farbliche Absetzung der Themen#
 custom_colors <- c("red", "blue", "green", "orange", viridis::viridis(length(unique(tsne_data$Topic)) - 4))
 
 # Visualisierung mit angepasster Farbskala
