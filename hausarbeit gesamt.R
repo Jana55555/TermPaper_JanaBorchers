@@ -723,3 +723,8 @@ ggplot(tsne_data, aes(x = X, y = Y, color = as.factor(Topic))) +
 dtm_sparse <- as(articles_dfm, "dgCMatrix")
 coherence_values <- CalcProbCoherence(phi = key_topics$phi, dtm = dtm_sparse, M = 10)
 coherence_per_topic <- coherence_values
+
+
+
+
+#
