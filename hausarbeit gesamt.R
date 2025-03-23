@@ -2,6 +2,14 @@
 #######################################################
 #Jana Borchers
 #Forschungspraktikum: Computational Social Science
+# Matrikelnummer: 8007047
+# Goethe-Universität Frankfurt
+# Fachbereich 03 Gesellschaftswissenschaften
+
+# Forschungspraktikum: 
+#   Computational Social Science
+# Dozent: Dr. Christian Czymara
+
 
 
 #Packages installieren
@@ -40,8 +48,9 @@ lapply(packages, library, character.only = TRUE) # laden
 #seed
 set.seed(123)
 
-###Datenvorbereitung###
-#Artikel einlesen
+#) 1 + 2.
+#####Datenvorbereitung#####
+##Artikel einlesen
 
 doc1 <- lnt_read("C:/Users/janab/Documents/Uni/CSS/Dateien palästina 1-500.docx")
 doc2 <- lnt_read("C:/Users/janab/Documents/Uni/CSS/Dateien palästina 501-1000.docx")
@@ -80,8 +89,14 @@ doc_combined <- new("LNToutput",
                     articles = articles_combined,
                     paragraphs = paragraphs_combined)
 
+
+
+
 ##Duplikate entfernen
 
+#duplicates <- lnt_similarity(LNToutput = doc_combined, threshold=.97)
+#doc_reduced <- doc_combined[!doc_combined@meta$ID %in% duplicates$ID_duplicate, ]
+#Duplikate werden nicht entfernt, alternativer Ansatz:
 
 doc_combined@articles <- doc_combined@articles %>%
   distinct(Article, .keep_all = TRUE)
@@ -98,7 +113,11 @@ doc_combined@articles$ID <- seq_len(nrow(doc_combined@articles))
 doc_combined@paragraphs <- doc_combined@paragraphs %>%
   filter(Art_ID %in% doc_combined@articles$ID)
 
-##Thematisch relevante Artikel identifizieren##
+
+
+
+
+##Thematisch relevante Artikel identifizieren
 articles_df <- doc_combined@articles
 articles <- articles_df$Article
 
@@ -134,37 +153,27 @@ dtm_rest <- DocumentTermMatrix(Corpus(VectorSource(rest_data$clean_text)),
                                control = list(dictionary = Terms(dtm_codierte)))
 df_codierte <- as.data.frame(as.matrix(dtm_codierte))
 
+df_codierte$thema <- as.factor(codierte_daten$Thema) # "thema" aus den codierten Daten hinzufügen
 
-# Zielvariable (thema) aus den codierten Daten hinzufügen
-df_codierte$thema <- as.factor(codierte_daten$Thema)
-
-# Trainiere das Modell (z.B. Random Forest)
+# Modell
 rf_model <- randomForest(thema ~ ., data = df_codierte, ntree = 100)
-
-# DTM für restliche Daten vorbereiten
-df_rest <- as.data.frame(as.matrix(dtm_rest))
-
-# Vorhersage für die restlichen Daten
-predictions <- predict(rf_model, newdata = df_rest)
+df_rest <- as.data.frame(as.matrix(dtm_rest)) # DTM für restliche Daten
+predictions <- predict(rf_model, newdata = df_rest) # Vorhersage für die restlichen Daten
 rest_data$predicted_thema <- predictions
 
 
 #Valdierung
-# Sample von 100 zufälligen Beobachtungen aus rest_data ziehen
 set.seed(42) 
-sample_rest_data <- rest_data[sample(1:nrow(rest_data), 100), ]
-
+sample_rest_data <- rest_data[sample(1:nrow(rest_data), 100), ] # Sample von 100 zufälligen Beobachtungen aus rest_data ziehen
 
 write.csv(sample_rest_data, "C:/Users/janab/Documents/Uni/CSS/predictions.csv", row.names = FALSE, fileEncoding = "UTF-8", quote = TRUE)
 
 
-########################
-# IDs der Artikel, die das Thema "Nein" zugewiesen bekommen haben
+# als "nicht dem Thema entsprechend" identifizierte Dateien aus dem lntoutput löschen
 sample_no <- codierte_daten[codierte_daten$Thema == "Nein", ]
 rest_no <- rest_data[rest_data$predicted_thema == "Nein", ]
 sample_no_ids <- sample_no$ID
 rest_no_ids <- rest_no$ID
-
 all_no_ids <- c(sample_no_ids, rest_no_ids)
 
 doc_combined@articles <- doc_combined@articles %>% #Artikel mit den "Nein"-IDs aus doc_combined@articles
@@ -177,34 +186,34 @@ doc_combined@articles$ID <- seq_len(nrow(doc_combined@articles))
 
 doc_combined@meta$ID <- seq_len(nrow(doc_combined@meta)) #ID in der meta-Tabelle neu setzen
 
-
 doc_combined@paragraphs <- doc_combined@paragraphs %>%
   filter(Art_ID %in% doc_combined@articles$ID) #die paragraphs-Tabelle filtern, sodass nur die Absätze übrig bleiben, deren Art_ID in den IDs der articles-Tabelle enthalten ist
 
+
+
+
+
+
 ##################################
 ##Textbereinigung, Tokenisierung
+# 2.1 
 
-# Zugriff auf die Artikel im LNToutput-Objekt + Metadaten
-articles <- tolower(slot(doc_combined, "articles")$Article)
+articles <- tolower(slot(doc_combined, "articles")$Article) # Zugriff auf die Artikel im LNToutput-Objekt + Metadaten
 meta_data <- doc_combined@meta
 
 
 #Collocations ersetzen
 collocations <- c("from the river to the sea", "fridays for future", "free palestine", "palestine will be free")
 
-# Funktion zum Ersetzen der Collocations durch lesbare Platzhalter
+
 replace_collocations <- function(articles, collocations) {
   for (collocation in collocations) {
-    # Ersetze Leerzeichen durch Unterstriche
     placeholder <- paste0("COLLOC_", gsub(" ", "_", collocation))
-    
     collocation_escaped <- gsub("\\.", "\\\\.", collocation)
-    
-    # Collocation im Text durch den Platzhalter ersetzen
     articles <- gsub(collocation_escaped, placeholder, articles, fixed = FALSE)  # fixed = FALSE für reguläre Ausdrücke
   }
   return(articles)
-}
+} # Funktion zum Ersetzen der Collocations durch lesbare Platzhalter
 
 
 docnames <- paste0("doc_", seq_along(articles))
@@ -215,7 +224,12 @@ text_with_placeholders_ <- gsub("\n", " ", text_with_placeholders) # Zeilenumbr�
 articles_corpus <- corpus(text_with_placeholders_, docnames = docnames) # Corpus erstellen
 
 
-#Tokenisierung
+
+
+
+#Tokenisierung + Bereinigung
+
+#Tokens erstellen
 articles_toks <- tokens(articles_corpus,
                         remove_punct = TRUE,
                         remove_numbers = TRUE,
@@ -223,8 +237,9 @@ articles_toks <- tokens(articles_corpus,
                         remove_separators = TRUE,
                         include_docvars = T)
 
-#german stopwords
-filepath <- "C:/Users/janab/Documents/Uni/CSS/stopwords-de.txt"
+
+#Stopwords entfernen
+filepath <- "C:/Users/janab/Documents/Uni/CSS/stopwords-de.txt" #german stopwords
 stopwords <- readLines(filepath)
 garbagewords <- c("graphic", "gesamtseiten-pdf", "weblink", "innen", "pdf", "pdf-dokument", "bild")
 
@@ -237,8 +252,11 @@ articles_toks <- tokens_remove(articles_toks, garbagewords, case_insensitive = T
 #                              max_docfreq = 0.7,
 #                              docfreq_type = "prop")
 
+
+
 #individuelles Stemming
-# Liste der Muster (patterns)
+
+# Liste der patterns
 patterns <- c("palästinensisch", "palästinensische", "palästinensischen", "palästinenser", "palästinensern", 
               "palästinas", 
               "israelisch", "israelische", "israelischen", "israelis", 
@@ -250,7 +268,7 @@ patterns <- c("palästinensisch", "palästinensische", "palästinensischen", "pa
               "pro-palästinensisch", "pro-palästinensische", "pro-palästinensischen", "propalästinensische", "propalästinensischen",
               "gaza-streifen", "gazastreifen")
 
-# Liste der Ersetzungen (replacements)
+# Liste der replacements
 replacements <- c(rep("palästin", 5), 
                   "palästina", 
                   rep("israeli", 4), 
@@ -267,6 +285,7 @@ replacements <- c(rep("palästin", 5),
 length(patterns)  # Prüfen, ob Längen übereinstimmen: Sollte 29 sein
 length(replacements)  # Sollte auch 29 sein
 
+
 for (i in 1:length(patterns)) {
   articles_toks <- tokens_replace(articles_toks, pattern = patterns[i], replacement = replacements[i])
 } # Anwenden der Ersetzungen mit purrr::reduce2
@@ -274,18 +293,61 @@ for (i in 1:length(patterns)) {
 
 
 head(articles_toks)
-#DFM
-articles_dfm <- dfm(articles_toks)
-topfeatures(articles_dfm, 50)
-articles_df <- doc_combined@articles
 
-###########KeyATM Model###############
-#####################################
-#) Convert
+#DFM erstellen 
+articles_dfm <- dfm(articles_toks)
+
+
+#) 2.2
+#) Deskriptive Auswertung:
+
+# 20 häufigste Begriffe
+topfeatures(articles_dfm, 20)
+
+#Bigrams
+colloc_find <- textstat_collocations(articles_toks, size = 2) %>%
+  arrange(desc(lambda)) # size = 2 for bigrams
+top_collocations2 <- colloc_find %>%
+  arrange(desc(count)) 
+head(50)
+
+top_collocations2 <- colloc_find %>%
+  arrange(desc(count)) 
+head(50)  
+
+print(top_collocations2)
+
+#3-grams
+colloc_find_3 <- textstat_collocations(articles_toks, size = 3)  # size = 3 
+
+top_collocations3 <- colloc_find_3 %>%
+  arrange(desc(count)) %>% ##sorted by count
+  head(50) 
+
+print(top_collocations3)
+### -> Ersetzen der Kollokationen durch Platzhalter in Abschnitt 2.1
+
+
+#Visualisierung der Beziehungen der Top-Begriffe
+articles_fcm <- fcm(articles_dfm)
+top_terms <- names(topfeatures(articles_dfm, 50))
+fcm_top_term <- fcm_select(articles_fcm, pattern = top_terms)
+
+textplot_network(fcm_top_term, min_freq = 0.9, edge_alpha = 0.3, edge_size = 3)
+
+
+####################################
+###########KEY ATM - Model##########
+####################################
+#) 3. 
+
+
+#) Konvertieren
 
 keyATMdocs <- keyATM_read(articles_dfm)
 
-#) Define Keywords
+
+#) Keywords definieren 
 
 keywords <- list(
   kritik = c("völkermord", "genozid", "besatzung", "kriegsverbrechen", "luftangriff", "kolonialismus", "apartheid"), 
@@ -294,7 +356,8 @@ keywords <- list(
   repressionen = c("repressionen", "polizei", "verboten", "polizeigewalt", "gericht", "prozess")
 )
 
-#KeyATM Model
+
+#) KeyATM Model
 k <- 10
 
 key_topics <- keyATM(
@@ -308,6 +371,10 @@ key_topics <- keyATM(
 
 top_words(key_topics, 20)
 
+
+
+
+
 #Ideale Anzahl Topics bestimmen#
 
 
@@ -317,6 +384,7 @@ topic_nums <- 5:30 # hier ursprünglich noch Berechnung von 5 bis 30,
 #im späteren Zusammenführen mit der Kohärenz werden nur noch 5er Schritte berücksichtigt.
 #Alternativer Code, der nur 5er Schritte berücksichtigt:
 
+###############################################################
 # topic_nums <- seq(5, 30, by = 5)
 # 
 # calculate_exclusivity <- function(k) {
@@ -347,7 +415,8 @@ topic_nums <- 5:30 # hier ursprünglich noch Berechnung von 5 bis 30,
 # 
 # exclusivity_scores <- sapply(topic_nums, calculate_exclusivity)
 # exklusivity_df <- data.frame(Topics = topic_nums, Exclusivity = exclusivity_scores)
-############################
+###########################################################################
+
 #Berechnung Exklusivität:
 calculate_exclusivity <- function(k) {
   key_topics <- keyATM(
@@ -361,12 +430,12 @@ calculate_exclusivity <- function(k) {
   # Phi-Matrix: Wahrscheinlichkeiten der Wörter pro Thema
   phi <- key_topics$phi  
   
-  # Berechne die Exklusivität
+  # Exklusivität berechnen
   exclusivity_scores <- apply(phi, 1, function(topic_probs) {
     sorted_probs <- sort(topic_probs, decreasing = TRUE)
     top_words <- names(sorted_probs)[1:20]  # Top 20 Wörter
     
-    # Überprüfe, wie stark diese Wörter in anderen Themen erscheinen
+    # Überprüfen, wie stark diese Wörter in anderen Themen erscheinen
     exclusivity_values <- sapply(top_words, function(word) {
       word_index <- which(colnames(phi) == word)
       word_probs <- phi[, word_index]
@@ -385,13 +454,12 @@ calculate_exclusivity <- function(k) {
 }
 
 
-# Berechnung der Exklusivitätswerte
-exclusivity_scores <- sapply(topic_nums, calculate_exclusivity)
+exclusivity_scores <- sapply(topic_nums, calculate_exclusivity) # Berechnung der Exklusivitätswerte
+exklusivity_df <- data.frame(Topics = topic_nums, Exclusivity = exclusivity_scores) # Ergebnisse in einem Dataframe zusammenfassen
 
-# Ergebnisse in einem Dataframe zusammenfassen
-exklusivity_df <- data.frame(Topics = topic_nums, Exclusivity = exclusivity_scores)
 
-##Berechnung der Kohärenz##
+
+#Berechnung Kohärenz:
 topic_range <- seq(5, 30, by = 5)
 coherence_values <- numeric(length(topic_range))
 
@@ -399,7 +467,7 @@ coherence_values <- numeric(length(topic_range))
 for (i in seq_along(topic_range)) {
   k <- topic_range[i]
   
-  # Trainiere das keyATM-Modell
+  # keyATM-Modell trainieren
   key_topics <- keyATM(
     docs = keyATMdocs,
     no_keyword_topics = k - 4, 
@@ -408,7 +476,7 @@ for (i in seq_along(topic_range)) {
     options = list(seed = 123)
   )
   
-  # Berechne die Kohärenz
+  # Kohärenz berechnen
   coherence_values[i] <- mean(CalcProbCoherence(
     phi = key_topics$phi, 
     dtm = as(articles_dfm, "dgCMatrix"),
@@ -432,7 +500,9 @@ ggplot(coherence_df, aes(x = Topics, y = Coherence)) +
     y = "Kohärenz"
   ) +
   theme_minimal()
-####################################
+
+#######
+
 #Zusammenbringen mit Exklusivität:
 excoh_df <- merge(
   coherence_df,            # Enthält Kohärenzwerte für 5, 10, 15, 20, 25, 30
@@ -462,7 +532,7 @@ ggplot(excoh_df, aes(x = Topics)) +
     axis.title.y.right = element_text(color = "blue")
   ) # schlechte Interpretierbarkeit, da unterschiedliche Skalen!
 
-#Werte normalisieren für bessere Darstellung
+#Werte normalisieren für bessere Darstellung:
 excoh_df$Coherence_scaled <- scales::rescale(excoh_df$Coherence, to = c(0, 1))
 excoh_df$Exclusivity_scaled <- scales::rescale(excoh_df$Exclusivity, to = c(0, 1))
 
@@ -484,10 +554,14 @@ ggplot(excoh_df, aes(x = Topics)) +
   ) +
   theme_minimal()
 
+
+
 ##################################
 #######Finales KeyATM-Modell######
 ##################################
+#) 4.
 
+################################################################################
 k <- 20
 
 key_topics <- keyATM(
@@ -501,42 +575,42 @@ key_topics <- keyATM(
 
 top_words(key_topics, 20)
 
-##########################################
+
+################################################################################
+
 #Inhaltliche Interpretation
+
+
 #Top Article pro Thema
-# Extrahiere die Wahrscheinlichkeiten aus der 'theta'-Matrix
+# 
 topic_assignments <- key_topics$theta
-
-# Finde das Thema mit der höchsten Wahrscheinlichkeit für jedes Dokument
 dominant_topics <- apply(topic_assignments, 1, which.max)
-
-# Erstelle einen DataFrame mit den Dokumenten und ihren dominanten Themen
 docs_with_topics <- data.frame(doc_id = 1:nrow(topic_assignments), 
-                               dominant_topic = dominant_topics)
+                               dominant_topic = dominant_topics) # Dataframe
 
-# Falls du die Themenbezeichner (z.B. '1_kritik', '2_forderungen', ...) anzeigen möchtest:
 topic_labels <- colnames(topic_assignments)  # Entspricht den Namen der Themen
 docs_with_topics$topic_name <- topic_labels[dominant_topics]
 
+
 head(docs_with_topics, n=40)
+
 
 #Texte mit höchsten Wahrscheinlichkeiten
 
 top_articles_per_topic <- list()
 
 for (topic in 1:ncol(topic_assignments)) {
-  # Finde die Zeilen (Dokumente) mit der höchsten Wahrscheinlichkeit für dieses Thema
+  # Dokumente mit der höchsten Wahrscheinlichkeit für dieses Thema
   top_docs <- order(topic_assignments[, topic], decreasing = TRUE)[1:5]  # z.B. die 5 Dokumente mit der höchsten Wahrscheinlichkeit
-  
-  # Extrahiere die entsprechenden Texte
+  # Texte extrahieren
   top_articles <- articles_df$Article[top_docs]
-  
-  # Speichere die Texte in der Liste
+  # Texte in der Liste speichern
   top_articles_per_topic[[colnames(topic_assignments)[topic]]] <- top_articles
 }
 
-# Zeige die Texte mit den höchsten Wahrscheinlichkeiten für jedes Thema an
-head(top_articles_per_topic)
+
+head(top_articles_per_topic) # Topics mit Top-Artikeln (= Texte mit der höchsten Wahrscheinlichkeit für jeweiliges Topic)
+
 
 #Beispieltexte anschauen
 articles_df$Article[docs_with_topics$doc_id == 27]
@@ -544,19 +618,19 @@ articles_df$Article[articles_df$ID == 9]
 docs_with_topics$topic_name[articles_df$ID == 120]
 
 #Welche Artikel wurden antisemitismus zugeordnet?
-# Filtere die Dokumente, die dem Thema "3_antisemitismus" zugeordnet sind
 topic_3_ids <- docs_with_topics[docs_with_topics$topic_name == "3_antisemitismus", "doc_id"]
-
-# Ausgabe der IDs
 print(topic_3_ids)
 
 
-#Visualisierung
-#Themenkorrelationen
+
+
+##Visualisierungen
+
+
 # Korrelation der Themenverteilungen (Theta-Matrix)
 topic_correlation <- cor(key_topics$theta)
 
-# Heatmap der Korrelationen
+
 ggplot(melt(topic_correlation), aes(Var1, Var2, fill = value)) +
   geom_tile() +
   scale_fill_gradient2(low = "blue", high = "red", mid = "white",
@@ -567,10 +641,12 @@ ggplot(melt(topic_correlation), aes(Var1, Var2, fill = value)) +
   ) +
   labs(title = "Themenkorrelationen", x = "Thema", y = "Thema")
 
+
+
 # tsne-Visualisierung
 unique_theta <- unique(key_topics$theta)
 tsne_result <- Rtsne(unique_theta, dims = 2)
-tsne_data$Topic <- apply(unique_theta, 1, which.max)
+tsne_data$Topic <- apply(unique_theta, 1, which.max) # dominantes Topic zuordnen
 
 
 tsne_data <- data.frame(
@@ -634,7 +710,6 @@ ggplot(tsne_data, aes(x = X, y = Y, color = as.factor(Topic))) +
 
 
 # Kohärenz per Topic
-# Berechne die Kohärenz
 dtm_sparse <- as(articles_dfm, "dgCMatrix")
 coherence_values <- CalcProbCoherence(phi = key_topics$phi, dtm = dtm_sparse, M = 10)
 coherence_per_topic <- coherence_values
