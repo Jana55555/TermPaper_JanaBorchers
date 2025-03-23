@@ -7,7 +7,7 @@
 # Fachbereich 03 Gesellschaftswissenschaften
 
 # Forschungspraktikum: 
-#   Computational Social Science
+# Computational Social Science
 # Dozent: Dr. Christian Czymara
 
 
@@ -117,6 +117,7 @@ doc_combined@paragraphs <- doc_combined@paragraphs %>%
 
 
 
+
 ##Thematisch relevante Artikel identifizieren
 articles_df <- doc_combined@articles
 articles <- articles_df$Article
@@ -151,13 +152,22 @@ rest_data$clean_text <- sapply(rest_data$Article, clean_text)
 dtm_codierte <- DocumentTermMatrix(Corpus(VectorSource(codierte_daten$clean_text)))
 dtm_rest <- DocumentTermMatrix(Corpus(VectorSource(rest_data$clean_text)), 
                                control = list(dictionary = Terms(dtm_codierte)))
-df_codierte <- as.data.frame(as.matrix(dtm_codierte))
 
+df_codierte <- as.data.frame(as.matrix(dtm_codierte))
 df_codierte$thema <- as.factor(codierte_daten$Thema) # "thema" aus den codierten Daten hinzufügen
+df_rest <- as.data.frame(as.matrix(dtm_rest)) # DTM für restliche Daten
+
 
 # Modell
-rf_model <- randomForest(thema ~ ., data = df_codierte, ntree = 100)
-df_rest <- as.data.frame(as.matrix(dtm_rest)) # DTM für restliche Daten
+#rf_model <- randomForest(thema ~ ., data = df_codierte, ntree = 100)
+# -> Dateien zu groß, Modell kann nicht berechnet werden
+
+#alternativ: ranger-Modell: 
+x <- df_codierte[, !names(df_codierte) %in% "thema"] # Entfernen der Zielvariable aus den Prädiktoren
+y <- df_codierte$thema
+
+rf_model <- ranger(x = x, y = y, num.trees = 100)
+
 predictions <- predict(rf_model, newdata = df_rest) # Vorhersage für die restlichen Daten
 rest_data$predicted_thema <- predictions
 
