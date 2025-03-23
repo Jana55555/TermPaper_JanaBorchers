@@ -159,7 +159,7 @@ df_rest <- as.data.frame(as.matrix(dtm_rest)) # DTM für restliche Daten
 
 
 # Modell
-#rf_model <- randomForest(thema ~ ., data = df_codierte, ntree = 100)
+rf_model <- randomForest(thema ~ ., data = df_codierte, ntree = 100)
 # -> Dateien zu groß, Modell kann nicht berechnet werden
 
 #alternativ: ranger-Modell: 
@@ -175,7 +175,6 @@ rest_data$predicted_thema <- predictions
 #Valdierung
 set.seed(42) 
 sample_rest_data <- rest_data[sample(1:nrow(rest_data), 100), ] # Sample von 100 zufälligen Beobachtungen aus rest_data ziehen
-
 write.csv(sample_rest_data, "C:/Users/janab/Documents/Uni/CSS/predictions.csv", row.names = FALSE, fileEncoding = "UTF-8", quote = TRUE)
 
 
@@ -727,4 +726,3 @@ coherence_per_topic <- coherence_values
 
 
 
-#
